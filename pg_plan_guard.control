@@ -1,0 +1,6 @@
+# pg_plan_guard — detect when a query plan drifts away from a known-good baseline
+comment = 'Watch query plans for drift against captured baselines (companion to pg_plan_advice)'
+default_version = '1.0'
+relocatable = false
+schema = plan_guard
+superuser = false
