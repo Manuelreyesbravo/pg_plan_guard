@@ -1,0 +1,13 @@
+# pg_regress output
+test/results/
+test/regression.diffs
+test/regression.out
+test/tmp_check/
+
+# PGXS build artifacts
+*.o
+*.so
+*.bc
+results/
+regression.diffs
+regression.out
