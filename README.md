@@ -125,6 +125,15 @@ the query. Verification is therefore cheap and safe to schedule.
 
 ## Install
 
+From [PGXN](https://pgxn.org/dist/pg_plan_guard/):
+
+```sh
+pgxn install pg_plan_guard
+psql -c 'CREATE EXTENSION pg_plan_guard'
+```
+
+From source:
+
 ```sh
 make install PG_CONFIG=/path/to/pg_config
 psql -c 'CREATE EXTENSION pg_plan_guard'
