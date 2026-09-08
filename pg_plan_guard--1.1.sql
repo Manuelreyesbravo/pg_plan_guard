@@ -416,22 +416,43 @@ REVOKE ALL ON FUNCTION plan_guard.sync_stash(text) FROM PUBLIC;
 
 CREATE FUNCTION plan_guard.watch(p_name text, p_query_sql text, p_note text DEFAULT NULL)
 RETURNS bigint
-LANGUAGE sql
--- NO `SET search_path`, and it is not an oversight. living_assertions records
--- the caller's search_path so the check keeps resolving names the way the
--- query's author meant. A SET clause here would take effect first and record
--- OURS -- and the watched query would then be checked against tables its author
--- never named. Any wrapper in front of declare() has the same obligation.
+-- plpgsql and a dynamic call, NOT a plain SQL body, and that is the difference
+-- between an optional dependency and a mandatory one. This extension is already
+-- published; `requires` in a control file is not per-version, so declaring it
+-- would force pg_living_assertions on somebody installing 1.0. A SQL body would
+-- have the same effect through the back door: SQL functions are validated when
+-- created, so CREATE EXTENSION would fail on a host without it. plpgsql bodies
+-- are not, so the extension installs and only watch() needs the companion.
+--
+-- NO `SET search_path` either, and that is not an oversight: living_assertions
+-- records the CALLER's path so the check keeps resolving names the way the
+-- query's author meant. A SET clause here would run first and record OURS, and
+-- the watched query would be checked against tables its author never named.
+-- Any wrapper in front of declare() carries the same obligation.
+LANGUAGE plpgsql
 AS $$
+DECLARE
+    id bigint;
+BEGIN
+    IF to_regnamespace('living_assertions') IS NULL THEN
+        RAISE EXCEPTION 'watch() needs pg_living_assertions'
+            USING HINT = 'CREATE EXTENSION pg_living_assertions; -- capture(), '
+                         'verify() and sync_stash() work without it.';
+    END IF;
+
     -- The EXPRESSION, not the advice. advice_for() re-plans against today's
     -- catalog and today's statistics every time the check runs, which is the
     -- whole point: a stored advice string compared against itself would be a
     -- check that can never fail.
-    SELECT living_assertions.declare_unchanged(
+    EXECUTE format(
+        'select living_assertions.declare_unchanged(%L, %L, %L)',
         'plan:' || p_name,
         coalesce(p_note || ' -- ', '') ||
-        'this query still plans the way it was approved',
-        format('select plan_guard.advice_for(%L)', p_query_sql));
+            'this query still plans the way it was approved',
+        format('select plan_guard.advice_for(%L)', p_query_sql))
+    INTO id;
+    RETURN id;
+END;
 $$;
 
 COMMENT ON FUNCTION plan_guard.watch(text, text, text) IS
