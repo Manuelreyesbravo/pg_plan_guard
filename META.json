@@ -2,7 +2,7 @@
    "name": "pg_plan_guard",
    "abstract": "Detect when a query plan drifts away from the plan you approved",
    "description": "PostgreSQL 19 added pg_plan_advice (generate advice for a plan, then force it) and pg_stash_advice (store advice per query_id and apply it automatically). Neither of them watches: there is no way to ask whether the plan for a query is still the plan you approved. pg_plan_guard answers that. It matters because a plan regression usually does not fail — the query returns the same rows, it just stops using the index and starts scanning. Nothing errors, nothing logs, nothing alerts. Baselines are compared as plan advice rather than EXPLAIN text, so they change only when the planner's decision changes, not when row estimates move.",
-   "version": "1.0.0",
+   "version": "1.1.0",
    "maintainer": [
       "Manuel Reyes <manuelreyesbravo@gmail.com>"
    ],
@@ -10,15 +10,16 @@
    "provides": {
       "pg_plan_guard": {
          "abstract": "Watch query plans for drift against captured baselines",
-         "file": "pg_plan_guard--1.0.sql",
+         "file": "pg_plan_guard--1.1.sql",
          "docfile": "README.md",
-         "version": "1.0.0"
+         "version": "1.1.0"
       }
    },
    "prereqs": {
       "runtime": {
          "requires": {
-            "PostgreSQL": "19.0.0"
+            "PostgreSQL": "19.0.0",
+            "pg_living_assertions": "0.4.0"
          },
          "recommends": {
             "pg_plan_advice": 0
