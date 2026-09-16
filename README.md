@@ -123,6 +123,16 @@ treated as a cache that can always be rebuilt from `plan_guard.baselines` via
 Baselines are captured with `EXPLAIN (PLAN_ADVICE)`, which **does not execute**
 the query. Verification is therefore cheap and safe to schedule.
 
+## Tested on
+
+PostgreSQL 19 only, and that is not conservatism: the extension reads plan
+advice through `pg_plan_advice`, which arrived in 19.  Verified on 2026-09-16
+by running `make installcheck` against 10 through 18 as well, each in a
+container of the official image: every one of them fails at the first capture
+with
+
+    ERROR:  pg_plan_guard requires pg_plan_advice (PostgreSQL 19+)
+
 ## Install
 
 From [PGXN](https://pgxn.org/dist/pg_plan_guard/):
