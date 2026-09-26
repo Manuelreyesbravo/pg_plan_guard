@@ -1,0 +1,62 @@
+name: CI
+
+# Every push and pull request is tested two ways on every supported
+# PostgreSQL:
+#   fresh    make install, then the regression suite (CREATE EXTENSION at the
+#            current version)
+#   upgrade  ci/upgrade_check.sh: install each earlier version -- every
+#            release on PGXN, put in place by ci/install_releases.sh -- ALTER
+#            EXTENSION UPDATE, and check that the result is identical to a
+#            fresh install, member by member (definition and comment)
+# A tag v* runs both and, only if they pass and the tag matches META.json,
+# builds the PGXN release zip.
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  test:
+    name: PostgreSQL ${{ matrix.pg }}
+    runs-on: ubuntu-latest
+    container: pgxn/pgxn-tools
+    strategy:
+      fail-fast: false
+      matrix:
+        pg: [19]
+    steps:
+      - name: Start PostgreSQL ${{ matrix.pg }}
+        run: pg-start ${{ matrix.pg }}
+      - name: Check out the repository
+        uses: actions/checkout@v4
+      - name: Install the scripts of every release on PGXN
+        run: bash ci/install_releases.sh
+      - name: Fresh install and regression suite
+        run: pg-build-test
+      - name: Upgrade from every earlier version
+        run: bash ci/upgrade_check.sh
+        env:
+          PGUSER: postgres
+
+  release:
+    name: PGXN release bundle
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    container: pgxn/pgxn-tools
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+      - name: Check that the tag matches META.json
+        run: |
+          meta=$(sed -n 's/^   "version": "\(.*\)",$/\1/p' META.json | head -1)
+          [ "v$meta" = "${GITHUB_REF_NAME}" ] || { echo "tag ${GITHUB_REF_NAME} but META.json says $meta"; exit 1; }
+      - name: Bundle
+        run: pgxn-bundle
+      - name: Keep the bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: pgxn-bundle
+          path: "*.zip"
