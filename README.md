@@ -1,5 +1,7 @@
 # pg_plan_guard
 
+[![CI](https://github.com/Manuelreyesbravo/pg_plan_guard/actions/workflows/ci.yml/badge.svg)](https://github.com/Manuelreyesbravo/pg_plan_guard/actions/workflows/ci.yml)
+
 **Detect when a query plan drifts away from the plan you approved.**
 
 PostgreSQL 19 added [`pg_plan_advice`](https://www.postgresql.org/docs/19/pgplanadvice.html)
