@@ -1,3 +1,6 @@
+-- Copyright 2026 Manuel Reyes Bravo
+-- SPDX-License-Identifier: PostgreSQL
+
 -- pg_plan_guard 1.0 -> 1.1
 --
 -- watch(): the approved plan becomes a living assertion.

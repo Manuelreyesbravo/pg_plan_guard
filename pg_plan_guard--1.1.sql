@@ -1,3 +1,6 @@
+-- Copyright 2026 Manuel Reyes Bravo
+-- SPDX-License-Identifier: PostgreSQL
+
 /* pg_plan_guard--1.0.sql
  *
  * Watch query plans for drift against known-good baselines.

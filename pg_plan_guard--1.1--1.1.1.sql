@@ -1,3 +1,6 @@
+-- Copyright 2026 Manuel Reyes Bravo
+-- SPDX-License-Identifier: PostgreSQL
+
 -- pg_plan_guard 1.1 -> 1.1.1
 --
 -- No schema change. This release adds project governance and legal files
