@@ -169,4 +169,6 @@ make installcheck PG_CONFIG=/path/to/pg_config
 
 ## License
 
-PostgreSQL License. See [LICENSE](LICENSE).
+PostgreSQL License -- see [LICENSE](LICENSE). Copyright 2026 Manuel Reyes Bravo.
+
+The name is not licensed with the code: see [TRADEMARK.md](TRADEMARK.md).
