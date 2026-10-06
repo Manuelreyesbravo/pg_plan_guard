@@ -12,7 +12,8 @@ EXTENSION   = pg_plan_guard
 DATA         = pg_plan_guard--1.0.sql \
                pg_plan_guard--1.1.sql \
                pg_plan_guard--1.0--1.1.sql \
-               pg_plan_guard--1.1--1.1.1.sql
+               pg_plan_guard--1.1--1.1.1.sql \
+               pg_plan_guard--1.1.1--1.1.2.sql
 PGFILEDESC  = "pg_plan_guard - detect query plan drift against known-good baselines"
 
 REGRESS          = basic
