@@ -1,5 +1,5 @@
 -- Copyright 2026 Manuel Reyes Bravo
--- SPDX-License-Identifier: PostgreSQL
+-- SPDX-License-Identifier: Apache-2.0
 
 -- pg_plan_guard 1.0 -> 1.1
 --

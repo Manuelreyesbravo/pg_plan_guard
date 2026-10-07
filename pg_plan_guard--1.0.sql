@@ -1,5 +1,5 @@
 -- Copyright 2026 Manuel Reyes Bravo
--- SPDX-License-Identifier: PostgreSQL
+-- SPDX-License-Identifier: Apache-2.0
 
 /* pg_plan_guard--1.0.sql
  *
@@ -40,7 +40,7 @@
  * PostgreSQL 19 or later with pg_plan_advice available. Baselines are captured
  * with EXPLAIN (PLAN_ADVICE), which does not execute the query.
  *
- * Copyright (c) 2026, licensed under the PostgreSQL License.
+ * Copyright (c) 2026 Manuel Reyes Bravo, licensed under the Apache License 2.0.
  */
 
 -- Guard against direct psql execution (standard practice for extension scripts)
