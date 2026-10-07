@@ -6,7 +6,7 @@
    "maintainer": [
       "Manuel Reyes <manuelreyesbravo@gmail.com>"
    ],
-   "license": "postgresql",
+   "license": "apache_2_0",
    "provides": {
       "pg_plan_guard": {
          "abstract": "Watch query plans for drift against captured baselines",
