@@ -11,3 +11,7 @@ test/tmp_check/
 results/
 regression.diffs
 regression.out
+
+# The throwaway cluster test/cluster.sh builds, and release bundles.
+.testcluster*
+*.zip

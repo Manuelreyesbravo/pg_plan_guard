@@ -101,6 +101,17 @@ dropped, column renamed) it is reported as `error` and the remaining baselines
 are still checked. A monitor that dies on the first problem stops working
 exactly when something is wrong.
 
+**A baseline is re-planned against the tables its author meant.** The query is
+stored as text, so the names in it are resolved by a `search_path`. `capture()`
+records the capturing session's, and `verify()` and `sync_stash()` re-plan under
+it with `pg_temp` moved to the end. So a baseline captured with `SET search_path
+= app` plans the same from `pg_cron`, and a temporary table in the verifying
+session cannot answer for a watched one: unnamed, PostgreSQL searches `pg_temp`
+first, and until 1.1.3 a temporary copy wrote false drifts into `drift_log` and
+hid real ones (`test/pg_temp.sh`). Baselines captured before 1.1.4 have no
+recorded path and are planned under the caller's, also with `pg_temp` last;
+capture them again to pin it.
+
 **The table is the source of truth, not shared memory.** `pg_stash_advice`
 persists across restarts, but if persistence ever fails or the cluster is
 recreated, the pinning disappears silently — queries keep working, just slowly.
@@ -155,6 +166,14 @@ Run the tests against a live server:
 
 ```sh
 make installcheck PG_CONFIG=/path/to/pg_config
+```
+
+And the `search_path` suite, in a throwaway cluster built from the same binaries:
+
+```sh
+PG_CONFIG=/path/to/pg_config test/cluster.sh init
+PG_CONFIG=/path/to/pg_config test/cluster.sh start
+make check-pgtemp PG_CONFIG=/path/to/pg_config
 ```
 
 ## Limitations
