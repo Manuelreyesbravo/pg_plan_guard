@@ -32,7 +32,7 @@ jobs:
       - name: Start PostgreSQL ${{ matrix.pg }}
         run: pg-start ${{ matrix.pg }}
       - name: Check out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install the scripts of every release on PGXN
         run: bash ci/install_releases.sh
       - name: Fresh install and regression suite
@@ -41,6 +41,13 @@ jobs:
         run: bash ci/upgrade_check.sh
         env:
           PGUSER: postgres
+      - name: Suites in a throwaway cluster (make check-suites)
+        # test/cluster.sh loads this checkout through extension_control_path,
+        # new in PostgreSQL 18; initdb refuses to run as root, so as postgres.
+        if: matrix.pg >= 18
+        run: |
+          chown -R postgres:postgres "$GITHUB_WORKSPACE"
+          su postgres -c "make check-suites PG_CONFIG=/usr/lib/postgresql/${{ matrix.pg }}/bin/pg_config"
 
   release:
     name: PGXN release bundle
@@ -50,7 +57,7 @@ jobs:
     container: pgxn/pgxn-tools
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check that the tag matches META.json
         run: |
           meta=$(sed -n 's/^   "version": "\(.*\)",$/\1/p' META.json | head -1)
@@ -58,7 +65,7 @@ jobs:
       - name: Bundle
         run: pgxn-bundle
       - name: Keep the bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: pgxn-bundle
           path: "*.zip"

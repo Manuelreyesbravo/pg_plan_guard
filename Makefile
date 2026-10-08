@@ -29,5 +29,18 @@ check-pgtemp:
 	@PG_CONFIG=$(PG_CONFIG) bash ./test/pg_temp.sh
 
 PG_CONFIG ?= pg_config
+# Every suite in SUITES, in a throwaway cluster built from PG_CONFIG's binaries and
+# stopped afterwards, whatever the suites answered. PostgreSQL 18 or later: the
+# cluster loads this checkout through extension_control_path. CI runs exactly
+# this on 18 and 19.
+SUITES = check-pgtemp
+.PHONY: check-suites
+check-suites:
+	@PG_CONFIG=$(PG_CONFIG) bash ./test/cluster.sh init
+	@PG_CONFIG=$(PG_CONFIG) bash ./test/cluster.sh start
+	@st=0; for s in $(SUITES); do echo "== $$s"; \
+	    $(MAKE) --no-print-directory $$s PG_CONFIG=$(PG_CONFIG) || st=1; done; \
+	 PG_CONFIG=$(PG_CONFIG) bash ./test/cluster.sh stop; exit $$st
+
 PGXS := $(shell $(PG_CONFIG) --pgxs)
 include $(PGXS)
