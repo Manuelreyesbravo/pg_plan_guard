@@ -4,6 +4,12 @@ Versions are released on [PGXN](https://pgxn.org/dist/pg_plan_guard/). Each
 upgrade script (`pg_plan_guard--OLD--NEW.sql`) documents, in its own header,
 exactly what changed and why; that is the authoritative per-version record.
 
+## 1.1.6 -- 2026-10-08
+
+* **Metadata only.** The PGXN description is two sentences now; the longer
+  explanation it carried is in this README. No code changed: the upgrade
+  script 1.1.5 -> 1.1.6 changes no object.
+
 ## 1.1.5 -- 2026-10-08
 
 From an external audit of 1.1.4, each finding measured on 1.1.4 before it was changed
