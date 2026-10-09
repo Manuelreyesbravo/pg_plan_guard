@@ -29,6 +29,10 @@
 #        rollback: a function the planner folds ran COPY ... TO PROGRAM as the role running
 #        verify(), left a session advisory lock behind, and pg_cancel_backend() of its own
 #        backend aborted verify() for every baseline. A baseline now plans as its author.
+#   S1   (round 5, on 1.1.8) SET ROLE is not a boundary: a folded function ran RESET ROLE, SET
+#        SESSION AUTHORIZATION DEFAULT or set_config('role', ...) and was the runner again,
+#        and a program ran. From 1.1.9 the EXPLAIN runs in a SECURITY DEFINER frame the author
+#        owns, where PostgreSQL refuses all three.
 #   and  sync_stash() aborted entirely on one baseline it could not plan.
 #
 # Run against the throwaway cluster: test/cluster.sh init && test/cluster.sh start.
@@ -215,6 +219,31 @@ check "  ...and the others are still verified" "atkb|" \
     "$(q -c "select name || '|' || state from plan_guard.verify() where name = 'atkb'" 2>&1)"
 check "rewriting a baseline's SQL makes the writer its author" "$ROLE" \
     "$(q -c "grant update on plan_guard.baselines to $ROLE" >/dev/null; qr -c "update plan_guard.baselines set query_sql = 'select v from app.t where id = 1' where name = 'atkb'" >/dev/null; q -c "select captured_by from plan_guard.baselines where name = 'atkb'")"
+
+echo "S1 (round 5): a baseline cannot leave the role it is planned as"
+# SET ROLE changes current_user and nothing else: until 1.1.8 a folded function ran RESET ROLE,
+# SET SESSION AUTHORIZATION DEFAULT or set_config('role', ...) and was the runner again.
+qr -q -c "create function public.back_reset() returns void language plpgsql volatile as \$\$ begin reset role; copy (select 1) to program 'touch $PWN'; end \$\$" \
+      -c "create function public.back_session() returns void language plpgsql volatile as \$\$ begin execute 'set session authorization default'; copy (select 1) to program 'touch $PWN'; end \$\$" \
+      -c "create function public.back_config() returns void language plpgsql volatile as \$\$ begin perform set_config('role', session_user, true); copy (select 1) to program 'touch $PWN'; end \$\$" \
+      -c "create function public.reset_imm() returns int language plpgsql immutable as \$\$ begin perform public.back_reset(); return 1; end \$\$" \
+      -c "create function public.session_imm() returns int language plpgsql immutable as \$\$ begin perform public.back_session(); return 1; end \$\$" \
+      -c "create function public.config_imm() returns int language plpgsql immutable as \$\$ begin perform public.back_config(); return 1; end \$\$" \
+      -c "insert into plan_guard.baselines (name, query_sql, advice) values ('s1_reset', 'select v from app.t where id = public.reset_imm()', 'x')" \
+      -c "insert into plan_guard.baselines (name, query_sql, advice) values ('s1_session', 'select v from app.t where id = public.session_imm()', 'x')" \
+      -c "insert into plan_guard.baselines (name, query_sql, advice) values ('s1_config', 'select v from app.t where id = public.config_imm()', 'x')" >/dev/null
+rm -f "$PWN"
+check "control: under SET ROLE to the author, RESET ROLE is the superuser again and the program runs" "ran=t" \
+    "$(q -c "begin" -c "set local role $ROLE" -c "select public.back_reset()" -c "rollback" >/dev/null; [ -f "$PWN" ] && echo ran=t || echo ran=f)"
+for way in reset session config; do
+    rm -f "$PWN"
+    check "s1_$way: verify() by the superuser runs no program" "ran=f" \
+        "$(q -c "select state from plan_guard.verify('s1_$way')" >/dev/null; [ -f "$PWN" ] && echo ran=t || echo ran=f)"
+    check "  ...and the baseline is in error" "error" "$(q -c "select state from plan_guard.baselines where name = 's1_$way'")"
+done
+check "the frame the seal builds is rolled back with it (hygiene, not a tooth: 1.1.8 builds none)" "frames=0" \
+    "$(q -c "select count(*) from plan_guard.verify()" -c "select 'frames=' || count(*) from pg_proc where proname = 'plan_guard_sealed_explain'" 2>&1 | tail -1)"
+rm -f "$PWN"
 q -q -c "delete from plan_guard.baselines where name like 's1_%'" -c "set search_path = atk" -c "select plan_guard.capture('atkb', 'select v from t where id = 5')" >/dev/null
 
 echo "F-12: a plan_guard schema created by someone else is refused"

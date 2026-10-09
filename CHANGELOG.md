@@ -4,6 +4,17 @@ Versions are released on [PGXN](https://pgxn.org/dist/pg_plan_guard/). Each
 upgrade script (`pg_plan_guard--OLD--NEW.sql`) documents, in its own header,
 exactly what changed and why; that is the authoritative per-version record.
 
+## 1.1.9 -- 2026-10-09
+
+* **A baseline cannot leave the role it is planned as.** From 1.1.7 its `EXPLAIN` ran after `SET
+  ROLE` to its author, and a folded function ran `RESET ROLE`, `SET SESSION AUTHORIZATION
+  DEFAULT` or `set_config('role', ...)` and was the runner again, then ran `COPY ... TO PROGRAM`
+  (external audit, round 5). The `EXPLAIN` now runs in a temporary `SECURITY DEFINER` function the
+  author owns, created and rolled back inside the seal; there PostgreSQL refuses to change role
+  or session authorization at all. Skipped only where it cannot change anything: capturing one's
+  own query costs what it cost. `test/audit.sh` adds S1, each way back red on 1.1.8 with its
+  control.
+
 ## 1.1.8 -- 2026-10-09
 
 * **F-12: a `plan_guard` schema created by someone else is refused.** `CREATE EXTENSION` used it,

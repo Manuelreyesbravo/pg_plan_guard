@@ -150,13 +150,24 @@ function ran them as whoever ran `verify()` -- usually a superuser (external
 audit, round 4). **Since 1.1.7 a baseline is planned as the role that wrote it.**
 `baselines.captured_by` records that role: a trigger sets it to whoever writes
 or rewrites the query, and accepts another name only from a role that may
-`SET ROLE` to it. Inside the seal the `EXPLAIN` runs after `SET ROLE` to the
-author, so a stored query can do no more than its author could do directly;
-anything beyond is that baseline's `error`, not an aborted `verify()`. Session
-advisory locks taken inside the seal are released. The role that runs `verify()`
-must be able to `SET ROLE` to each author -- a superuser can; otherwise grant it
-membership. A baseline captured before 1.1.7 has no recorded author and is
-refused until it is captured again.
+`SET ROLE` to it. **Since 1.1.9 the `EXPLAIN` runs inside a temporary `SECURITY
+DEFINER` function owned by the author**, created and rolled back inside the seal.
+Inside such a function PostgreSQL refuses to change `role` or
+`session_authorization` at all, so a stored query can do no more than its author
+could do directly and cannot become anyone else; anything beyond is that
+baseline's `error`, not an aborted `verify()`. Session advisory locks taken inside
+the seal are released. The role that runs `verify()` must be able to hand that
+function to each author -- a superuser can; otherwise it needs to be able to `SET
+ROLE` to the author, and the author needs `TEMP` on the database. A baseline
+captured before 1.1.7 has no recorded author and is refused until it is captured
+again.
+
+In 1.1.7 and 1.1.8 the `EXPLAIN` ran after `SET ROLE` to the author instead, and
+an external audit (round 5) measured why that is not a boundary: a folded
+function ran `RESET ROLE`, `SET SESSION AUTHORIZATION DEFAULT` or
+`set_config('role', ...)` and was the runner again, then ran a program. `make
+check-audit` (S1) shows each way back refused, against a control that shows it
+working under `SET ROLE`.
 
 `capture()`, `verify()` and `advice_for()` work for a role that is not a
 superuser once `pg_plan_advice` is in `shared_preload_libraries`: `LOAD` needs
