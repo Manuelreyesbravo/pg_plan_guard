@@ -4,6 +4,14 @@ Versions are released on [PGXN](https://pgxn.org/dist/pg_plan_guard/). Each
 upgrade script (`pg_plan_guard--OLD--NEW.sql`) documents, in its own header,
 exactly what changed and why; that is the authoritative per-version record.
 
+## 1.1.8 -- 2026-10-09
+
+* **F-12: a `plan_guard` schema created by someone else is refused.** `CREATE EXTENSION` used it,
+  and its owner -- any role with CREATE on the database -- could drop it, and the extension with
+  every baseline and the drift history (external audit of 1.1.4). The install and every upgrade
+  refuse a `plan_guard` schema owned by a role that is neither the installer nor a superuser
+  (`test/audit.sh`, red on 1.1.7).
+
 ## 1.1.7 -- 2026-10-09
 
 * **A baseline is planned as the role that wrote it (PG-S1, external audit round 4).**

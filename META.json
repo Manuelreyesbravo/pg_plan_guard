@@ -2,7 +2,7 @@
    "name": "pg_plan_guard",
    "abstract": "Detect when a query plan drifts away from the plan you approved",
    "description": "pg_plan_guard records the plan you approved for a query and tells you when the planner quietly stops using it — the regression that returns the same rows while dropping an index, with nothing logged. Baselines are compared as plan advice, so they move only when the planner's decision changes, not when row estimates do.",
-   "version": "1.1.7",
+   "version": "1.1.8",
    "maintainer": [
       "Manuel Reyes <manuelreyesbravo@gmail.com>"
    ],
@@ -12,14 +12,14 @@
          "abstract": "Watch query plans for drift against captured baselines",
          "file": "pg_plan_guard--1.1.sql",
          "docfile": "README.md",
-         "version": "1.1.7"
+         "version": "1.1.8"
       }
    },
    "prereqs": {
       "runtime": {
          "requires": {
             "PostgreSQL": "19.0.0",
-            "pg_living_assertions": "0.5.6"
+            "pg_living_assertions": "0.5.9"
          },
          "recommends": {
             "pg_plan_advice": 0

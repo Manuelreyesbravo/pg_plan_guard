@@ -23,6 +23,7 @@
 #   F-11 a query whose text contained "Generated Plan Advice:" leaked plan lines into the
 #        advice.
 #   F-13 drift_log, documented as append-only, could be updated and deleted.
+#   F-12 CREATE EXTENSION used a plan_guard schema another role owned, which could drop it.
 #   F-14 query_id_for() left compute_query_id = on in the caller's transaction.
 #   PG-S1 (audit round 4, on 1.1.5) the seal stops writes to the database, not what outlives a
 #        rollback: a function the planner folds ran COPY ... TO PROGRAM as the role running
@@ -215,6 +216,14 @@ check "  ...and the others are still verified" "atkb|" \
 check "rewriting a baseline's SQL makes the writer its author" "$ROLE" \
     "$(q -c "grant update on plan_guard.baselines to $ROLE" >/dev/null; qr -c "update plan_guard.baselines set query_sql = 'select v from app.t where id = 1' where name = 'atkb'" >/dev/null; q -c "select captured_by from plan_guard.baselines where name = 'atkb'")"
 q -q -c "delete from plan_guard.baselines where name like 's1_%'" -c "set search_path = atk" -c "select plan_guard.capture('atkb', 'select v from t where id = 5')" >/dev/null
+
+echo "F-12: a plan_guard schema created by someone else is refused"
+SQUAT=${DB}_squat
+$PSQL -X -d postgres -qc "create database $SQUAT" -c "grant create on database $SQUAT to $ROLE" >/dev/null
+PGUSER=$ROLE $PSQL -X -d "$SQUAT" -qc "create schema plan_guard" >/dev/null
+check "control: the role owns the schema" "$ROLE" "$($PSQL -X -d "$SQUAT" -tAc "select nspowner::regrole from pg_namespace where nspname = 'plan_guard'")"
+check "CREATE EXTENSION refuses it" "owned by $ROLE, not by the installer" "$($PSQL -X -d "$SQUAT" -tAc "create extension pg_plan_guard" 2>&1)"
+$PSQL -X -d postgres -qc "drop database if exists $SQUAT" >/dev/null 2>&1 || true
 
 echo "F-06: after pg_dump and restore, new rows still get new ids"
 "$BIN/pg_dump" -Fc -d "$DB" -f "$DUMP"
