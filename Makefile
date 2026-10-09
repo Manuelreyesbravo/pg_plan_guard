@@ -17,7 +17,8 @@ DATA         = pg_plan_guard--1.0.sql \
                pg_plan_guard--1.1.2--1.1.3.sql \
                pg_plan_guard--1.1.3--1.1.4.sql \
                pg_plan_guard--1.1.4--1.1.5.sql \
-               pg_plan_guard--1.1.5--1.1.6.sql
+               pg_plan_guard--1.1.5--1.1.6.sql \
+               pg_plan_guard--1.1.6--1.1.7.sql
 PGFILEDESC  = "pg_plan_guard - detect query plan drift against known-good baselines"
 
 REGRESS          = basic

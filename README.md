@@ -142,9 +142,21 @@ function called with constant arguments, so a stored query can run code as
 whoever plans it. Since 1.1.5 every `EXPLAIN` of stored text runs sealed, the
 way pg_living_assertions runs a check: in a subtransaction switched to read-only
 and always rolled back, under a path pinned to `pg_catalog, pg_temp` outside it.
-What planning does is refused if it writes and undone if it does not. Treat the
-right to write `plan_guard.baselines` as the right to run read-only SQL as the
-role that runs `verify()`.
+What planning does is refused if it writes and undone if it does not.
+
+A seal is not enough on its own: `COPY ... TO PROGRAM`, `pg_switch_wal()` or a
+session advisory lock are not writes to the database, and until 1.1.7 a folded
+function ran them as whoever ran `verify()` -- usually a superuser (external
+audit, round 4). **Since 1.1.7 a baseline is planned as the role that wrote it.**
+`baselines.captured_by` records that role: a trigger sets it to whoever writes
+or rewrites the query, and accepts another name only from a role that may
+`SET ROLE` to it. Inside the seal the `EXPLAIN` runs after `SET ROLE` to the
+author, so a stored query can do no more than its author could do directly;
+anything beyond is that baseline's `error`, not an aborted `verify()`. Session
+advisory locks taken inside the seal are released. The role that runs `verify()`
+must be able to `SET ROLE` to each author -- a superuser can; otherwise grant it
+membership. A baseline captured before 1.1.7 has no recorded author and is
+refused until it is captured again.
 
 `capture()`, `verify()` and `advice_for()` work for a role that is not a
 superuser once `pg_plan_advice` is in `shared_preload_libraries`: `LOAD` needs

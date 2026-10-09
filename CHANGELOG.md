@@ -4,6 +4,24 @@ Versions are released on [PGXN](https://pgxn.org/dist/pg_plan_guard/). Each
 upgrade script (`pg_plan_guard--OLD--NEW.sql`) documents, in its own header,
 exactly what changed and why; that is the authoritative per-version record.
 
+## 1.1.7 -- 2026-10-09
+
+* **A baseline is planned as the role that wrote it (PG-S1, external audit round 4).**
+  The 1.1.5 seal (read-only, rolled back) stops writes to the database, not what is not
+  one: a function the planner folds ran `COPY ... TO PROGRAM` (measured: a file created
+  by the server's OS user), `pg_switch_wal()`, `pg_create_restore_point()` and
+  `pg_stat_reset()` as the role running `verify()`; a session advisory lock stayed in
+  that session; and `pg_cancel_backend()` of its own backend aborted `verify()` and
+  `sync_stash()` for every baseline. A role needed only INSERT on `baselines`.
+  `baselines.captured_by` now records the author -- set by a trigger to whoever writes or
+  rewrites the query, another name accepted only from a role that may `SET ROLE` to it --
+  and the sealed `EXPLAIN` runs after `SET ROLE` to that author. What needs more than the
+  author has is that baseline's `error`; advisory locks taken in the seal are released.
+* **A baseline captured before 1.1.7 is refused until captured again** (state `error`,
+  "no recorded author"); the upgrade names them. Running it as the caller is the hole
+  this closes, so the default stays closed.
+* `test/audit.sh`: the PG-S1 teeth, red on 1.1.6 with their controls green.
+
 ## 1.1.6 -- 2026-10-08
 
 * **Metadata only.** The PGXN description is two sentences now; the longer

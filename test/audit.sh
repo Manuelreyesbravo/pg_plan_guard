@@ -24,6 +24,10 @@
 #        advice.
 #   F-13 drift_log, documented as append-only, could be updated and deleted.
 #   F-14 query_id_for() left compute_query_id = on in the caller's transaction.
+#   PG-S1 (audit round 4, on 1.1.5) the seal stops writes to the database, not what outlives a
+#        rollback: a function the planner folds ran COPY ... TO PROGRAM as the role running
+#        verify(), left a session advisory lock behind, and pg_cancel_backend() of its own
+#        backend aborted verify() for every baseline. A baseline now plans as its author.
 #   and  sync_stash() aborted entirely on one baseline it could not plan.
 #
 # Run against the throwaway cluster: test/cluster.sh init && test/cluster.sh start.
@@ -178,6 +182,39 @@ check "control: it has rows" "rows=true" "$(q -c "select 'rows=' || (count(*) > 
 check "UPDATE is refused" "ERROR" "$(q -c "update plan_guard.drift_log set expected_advice = 'forged'")"
 check "DELETE is refused" "ERROR" "$(q -c "delete from plan_guard.drift_log")"
 check "TRUNCATE is refused" "ERROR" "$(q -c "truncate plan_guard.drift_log")"
+
+echo "PG-S1: a baseline plans as the role that wrote it, not as the one running verify()"
+PWN=$RAIZ/.testcluster/plan_guard_pwn
+rm -f "$PWN"
+q -q -c "grant create on schema public to $ROLE" -c "grant insert on plan_guard.baselines to $ROLE" >/dev/null
+qr -q -c "create function public.cp_vol() returns void language plpgsql volatile as \$\$ begin copy (select 1) to program 'touch $PWN'; end \$\$" \
+      -c "create function public.cp_imm() returns int language plpgsql immutable as \$\$ begin perform public.cp_vol(); return 1; end \$\$" \
+      -c "create function public.lock_vol() returns void language plpgsql volatile as \$\$ begin perform pg_advisory_lock(424242); end \$\$" \
+      -c "create function public.lock_imm() returns int language plpgsql immutable as \$\$ begin perform public.lock_vol(); return 1; end \$\$" \
+      -c "create function public.cancel_vol() returns void language plpgsql volatile as \$\$ begin perform pg_cancel_backend(pg_backend_pid()); perform pg_sleep(1); end \$\$" \
+      -c "create function public.cancel_imm() returns int language plpgsql immutable as \$\$ begin perform public.cancel_vol(); return 1; end \$\$" >/dev/null
+check "control: as the superuser, the folded function runs a program" "ran=t" \
+    "$(q -c "select public.cp_imm()" >/dev/null; [ -f "$PWN" ] && echo ran=t || echo ran=f)"
+rm -f "$PWN"
+qr -q -c "insert into plan_guard.baselines (name, query_sql, advice) values ('s1_copy', 'select v from app.t where id = public.cp_imm()', 'x')" \
+      -c "insert into plan_guard.baselines (name, query_sql, advice) values ('s1_lock', 'select v from app.t where id = public.lock_imm()', 'x')" >/dev/null
+check "a role with INSERT on baselines cannot sign a baseline as the superuser" "cannot act as" \
+    "$(qr -c "insert into plan_guard.baselines (name, query_sql, advice, captured_by) select 's1_forged', 'select 1', 'x', rolname from pg_roles where rolsuper limit 1" 2>&1)"
+check "  ...and an explicit NULL author is refused by verify()" "no recorded author" \
+    "$(qr -c "insert into plan_guard.baselines (name, query_sql, advice, captured_by) values ('s1_null', 'select 1', 'x', NULL)" >/dev/null; q -c "select actual_advice from plan_guard.verify('s1_null')")"
+check "verify() by the superuser of that role's baseline runs no program" "ran=f" \
+    "$(q -c "select state from plan_guard.verify('s1_copy')" >/dev/null; [ -f "$PWN" ] && echo ran=t || echo ran=f)"
+check "  ...and the baseline says why" "error" "$(q -c "select state from plan_guard.baselines where name = 's1_copy'")"
+check "verify() leaves no advisory lock behind in the runner's session" "locks=0" \
+    "$(q -c "select state from plan_guard.verify('s1_lock')" -c "select 'locks=' || count(*) from pg_locks where locktype = 'advisory' and pid = pg_backend_pid()" | tail -1)"
+qr -c "insert into plan_guard.baselines (name, query_sql, advice) values ('s1_cancel', 'select v from app.t where id = public.cancel_imm()', 'x')" >/dev/null
+check "a baseline that cancels its own backend does not abort verify() for the others" "s1_cancel|error" \
+    "$(q -c "select name || '|' || state from plan_guard.verify() where name in ('s1_cancel', 'atkb')" 2>&1 | sort | paste -sd' ')"
+check "  ...and the others are still verified" "atkb|" \
+    "$(q -c "select name || '|' || state from plan_guard.verify() where name = 'atkb'" 2>&1)"
+check "rewriting a baseline's SQL makes the writer its author" "$ROLE" \
+    "$(q -c "grant update on plan_guard.baselines to $ROLE" >/dev/null; qr -c "update plan_guard.baselines set query_sql = 'select v from app.t where id = 1' where name = 'atkb'" >/dev/null; q -c "select captured_by from plan_guard.baselines where name = 'atkb'")"
+q -q -c "delete from plan_guard.baselines where name like 's1_%'" -c "set search_path = atk" -c "select plan_guard.capture('atkb', 'select v from t where id = 5')" >/dev/null
 
 echo "F-06: after pg_dump and restore, new rows still get new ids"
 "$BIN/pg_dump" -Fc -d "$DB" -f "$DUMP"

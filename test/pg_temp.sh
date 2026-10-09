@@ -109,10 +109,13 @@ if [ -z "$VERSION" ]; then
     crear 1.1.3
     comprobar "the upgrade warns about the baselines it cannot pin" "3 baseline(s)" \
         "$(q -c "ALTER EXTENSION pg_plan_guard UPDATE" | grep -o '[0-9]* baseline(s)')"
-    comprobar "a baseline from 1.1.3: a temporary p still does not make it drift" "ok" \
+    # From 1.1.7 a baseline is planned as its author, and one from before has none: it is
+    # refused until captured again, so its path can no longer be measured before that.
+    comprobar "a baseline from 1.1.3 is refused until captured again (no recorded author)" "no recorded author" \
+        "$(q -c "select actual_advice from plan_guard.verify('q_p')" | grep -o 'no recorded author')"
+    q -q -c "select plan_guard.capture('q_p', 'SELECT * FROM p WHERE id = 42')" >/dev/null
+    comprobar "re-captured, a temporary p does not make it drift" "ok" \
         "$(q -c "$TEMP_P" -c "$(estado q_p)" | tail -1)"
-    comprobar "control: a 1.1.3 baseline outside public needs its path until re-captured" "error" \
-        "$(q -c "$(estado q_app)")"
     q -q -c "set search_path = app" -c "select plan_guard.capture('q_app', 'SELECT * FROM t WHERE id = 42')" >/dev/null
     comprobar "re-captured, it records its path" "app" \
         "$(q -c "select search_path from plan_guard.baselines where name = 'q_app'")"
