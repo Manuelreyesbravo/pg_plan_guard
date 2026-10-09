@@ -42,12 +42,12 @@ set -euo pipefail
 PG_CONFIG=${PG_CONFIG:-pg_config}
 BIN=$("$PG_CONFIG" --bindir)
 PSQL=${PSQL:-$BIN/psql}
-RAIZ=$(cd "$(dirname "$0")/.." && pwd)
-export PGHOST=${PGHOST:-$RAIZ/.testcluster} PGPORT=${PGPORT:-5493}
+REPO_ROOT=$(cd "$(dirname "$0")/.." && pwd)
+export PGHOST=${PGHOST:-$REPO_ROOT/.testcluster} PGPORT=${PGPORT:-5493}
 DB=plan_guard_test_audit
 RESTORED=plan_guard_test_audit_restored
 ROLE=plan_guard_test_audit_role
-DUMP=$RAIZ/.testcluster/audit.dump
+DUMP=$REPO_ROOT/.testcluster/audit.dump
 failures=0
 
 for d in "$DB" "$RESTORED"; do
@@ -189,7 +189,7 @@ check "DELETE is refused" "ERROR" "$(q -c "delete from plan_guard.drift_log")"
 check "TRUNCATE is refused" "ERROR" "$(q -c "truncate plan_guard.drift_log")"
 
 echo "PG-S1: a baseline plans as the role that wrote it, not as the one running verify()"
-PWN=$RAIZ/.testcluster/plan_guard_pwn
+PWN=$REPO_ROOT/.testcluster/plan_guard_pwn
 rm -f "$PWN"
 q -q -c "grant create on schema public to $ROLE" -c "grant insert on plan_guard.baselines to $ROLE" >/dev/null
 qr -q -c "create function public.cp_vol() returns void language plpgsql volatile as \$\$ begin copy (select 1) to program 'touch $PWN'; end \$\$" \
