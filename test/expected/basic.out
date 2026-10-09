@@ -100,8 +100,8 @@ ERROR:  relation "guard_test.does_not_exist" does not exist
 LINE 1: EXPLAIN (COSTS OFF, PLAN_ADVICE) SELECT * FROM guard_test.do...
                                                        ^
 QUERY:  EXPLAIN (COSTS OFF, PLAN_ADVICE) SELECT * FROM guard_test.does_not_exist
-CONTEXT:  PL/pgSQL function plan_guard.advice_for(text) line 15 at FOR over EXECUTE statement
-PL/pgSQL function plan_guard._advice_under(text,text) line 5 at RETURN
+CONTEXT:  PL/pgSQL function plan_guard._explain_lines(text,text,text,boolean) line 17 at FOR over EXECUTE statement
+PL/pgSQL function plan_guard._advice_under(text,text) line 7 at assignment
 PL/pgSQL function plan_guard.capture(text,text,text) line 15 at assignment
 DROP SCHEMA guard_test CASCADE;
 DROP EXTENSION pg_plan_guard CASCADE;

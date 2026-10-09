@@ -110,7 +110,10 @@ session cannot answer for a watched one: unnamed, PostgreSQL searches `pg_temp`
 first, and until 1.1.3 a temporary copy wrote false drifts into `drift_log` and
 hid real ones (`test/pg_temp.sh`). Baselines captured before 1.1.4 have no
 recorded path and are planned under the caller's, also with `pg_temp` last;
-capture them again to pin it.
+capture them again to pin it. The recorded path is applied only inside the
+sealed `EXPLAIN` described below, so it never reaches the session that called
+`verify()` -- until 1.1.5 it did, and that session's next `capture()` recorded
+the baseline's path instead of its own (`test/audit.sh`).
 
 **The table is the source of truth, not shared memory.** `pg_stash_advice`
 persists across restarts, but if persistence ever fails or the cluster is
@@ -134,7 +137,19 @@ treated as a cache that can always be rebuilt from `plan_guard.baselines` via
   ```
 
 Baselines are captured with `EXPLAIN (PLAN_ADVICE)`, which **does not execute**
-the query. Verification is therefore cheap and safe to schedule.
+the query -- but planning is not nothing: the planner folds an `IMMUTABLE`
+function called with constant arguments, so a stored query can run code as
+whoever plans it. Since 1.1.5 every `EXPLAIN` of stored text runs sealed, the
+way pg_living_assertions runs a check: in a subtransaction switched to read-only
+and always rolled back, under a path pinned to `pg_catalog, pg_temp` outside it.
+What planning does is refused if it writes and undone if it does not. Treat the
+right to write `plan_guard.baselines` as the right to run read-only SQL as the
+role that runs `verify()`.
+
+`capture()`, `verify()` and `advice_for()` work for a role that is not a
+superuser once `pg_plan_advice` is in `shared_preload_libraries`: `LOAD` needs
+superuser, and since 1.1.5 a refused `LOAD` of an already loaded library is not
+an error. `sync_stash()` sets `compute_query_id`, which only a superuser can.
 
 ## Tested on
 
@@ -185,6 +200,14 @@ make check-pgtemp PG_CONFIG=/path/to/pg_config
   bad plan. Review what `capture()` returns.
 - `capture()` and `verify()` run `EXPLAIN` on stored SQL, so execute rights are
   not granted to `PUBLIC`.
+- `verify()` plans with the settings of the session that runs it, not those of
+  the application's role: a planner setting on that role (`enable_indexscan`,
+  say) is not seen.
+- A query_id ignores constants, so two baselines of one statement with
+  different literals share a stash slot, and the last `sync_stash()` writes
+  wins.
+- A temporary table still answers for a name found nowhere on the recorded
+  path: `pg_temp` goes last, not away.
 
 ## License
 

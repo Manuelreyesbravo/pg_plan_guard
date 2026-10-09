@@ -15,7 +15,8 @@ DATA         = pg_plan_guard--1.0.sql \
                pg_plan_guard--1.1--1.1.1.sql \
                pg_plan_guard--1.1.1--1.1.2.sql \
                pg_plan_guard--1.1.2--1.1.3.sql \
-               pg_plan_guard--1.1.3--1.1.4.sql
+               pg_plan_guard--1.1.3--1.1.4.sql \
+               pg_plan_guard--1.1.4--1.1.5.sql
 PGFILEDESC  = "pg_plan_guard - detect query plan drift against known-good baselines"
 
 REGRESS          = basic
@@ -28,12 +29,17 @@ REGRESS_OPTS     = --inputdir=test --outputdir=test
 check-pgtemp:
 	@PG_CONFIG=$(PG_CONFIG) bash ./test/pg_temp.sh
 
+# The findings of the external audit of 1.1.4, each against its control.
+.PHONY: check-audit
+check-audit:
+	@PG_CONFIG=$(PG_CONFIG) bash ./test/audit.sh
+
 PG_CONFIG ?= pg_config
 # Every suite in SUITES, in a throwaway cluster built from PG_CONFIG's binaries and
 # stopped afterwards, whatever the suites answered. PostgreSQL 18 or later: the
 # cluster loads this checkout through extension_control_path. CI runs exactly
 # this on 18 and 19.
-SUITES = check-pgtemp
+SUITES = check-pgtemp check-audit
 .PHONY: check-suites
 check-suites:
 	@PG_CONFIG=$(PG_CONFIG) bash ./test/cluster.sh init

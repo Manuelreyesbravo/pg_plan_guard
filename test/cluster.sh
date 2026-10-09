@@ -45,6 +45,12 @@ listen_addresses = 'localhost'
 unix_socket_directories = '$DATA'
 extension_control_path = '$EXT:\$system'
 EOF
+    # Preloaded where they exist (PostgreSQL 19+), as a server running pg_plan_guard has
+    # them: LOAD needs superuser, and test/audit.sh captures as a role that is not one.
+    LIB=$("$PG_CONFIG" --pkglibdir)
+    if [ -f "$LIB/pg_plan_advice.so" ] && [ -f "$LIB/pg_stash_advice.so" ]; then
+        echo "shared_preload_libraries = 'pg_plan_advice, pg_stash_advice'" >>"$DATA/postgresql.conf"
+    fi
     echo "initialised $DATA on port $PORT"
     ;;
   start)

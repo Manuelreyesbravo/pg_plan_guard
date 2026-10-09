@@ -4,6 +4,45 @@ Versions are released on [PGXN](https://pgxn.org/dist/pg_plan_guard/). Each
 upgrade script (`pg_plan_guard--OLD--NEW.sql`) documents, in its own header,
 exactly what changed and why; that is the authoritative per-version record.
 
+## 1.1.5 -- 2026-10-08
+
+From an external audit of 1.1.4, each finding measured on 1.1.4 before it was changed
+(`test/audit.sh`, `make check-audit`, in `make check-suites`: every tooth red on 1.1.4
+with its control green).
+
+* **The baseline's `search_path` no longer leaks into the caller's session (F-01).**
+  1.1.4 applied it with `set_config(..., false)` inside helpers with a `SET` clause and
+  said the clause would restore the caller's path; a plain `SET` overrides the clause
+  and outlives it. After `verify()` the session kept the baseline's path, and its next
+  `capture()` recorded that path and blessed a plan of another schema's table.
+* **Every `EXPLAIN` of stored text runs sealed (F-02, F-03, F-14).** The planner folds
+  an `IMMUTABLE` function with constant arguments, so a stored query ran code as whoever
+  ran `verify()`, and kept what it did; and the advice was parsed with an unqualified
+  `||` under the baseline's path, so an operator in a schema on it ran too. One function,
+  `_explain_lines()`, now runs every `EXPLAIN` in a subtransaction switched to read-only
+  and always rolled back, applies the baseline's path and `compute_query_id` inside it
+  with `set_config(..., true)`, and parses under `pg_catalog, pg_temp`. `query_id_for()`
+  no longer leaves `compute_query_id = on` in the caller's transaction.
+* **A role that is not a superuser can capture (F-04)** when `pg_plan_advice` is
+  preloaded: a refused `LOAD` of a loaded library is not an error any more.
+* **A baseline that cannot be planned is logged on the transition (F-05),** like a
+  drift, not on every run.
+* **The identity sequences travel with `pg_dump` (F-06).** After a restore they
+  started again at 1, and the first drift or capture died on a duplicate key. The
+  upgrade also moves them past the ids an earlier restore left.
+* **Re-capturing a name forgets the old statement's query_id (F-07),** and
+  `sync_stash()` always computes it again -- and goes on past a baseline it cannot
+  plan, instead of aborting on the first one with everything it had done.
+* **The recorded path is read the way PostgreSQL reads it (F-10):** an unquoted
+  `PG_TEMP` is `pg_temp` (a path from `set_config()` or `ALTER ROLE ... SET` is
+  recorded as written), and a quoted schema name with a comma in it is one name.
+* **Only the lines after the last "Generated Plan Advice:" header are the advice
+  (F-11):** a query whose text contained the header leaked plan lines into it.
+* **`drift_log` is append-only (F-13),** as documented: `UPDATE`, `DELETE` and
+  `TRUNCATE` are refused by triggers.
+* `test/cluster.sh` preloads `pg_plan_advice` and `pg_stash_advice` where they exist,
+  as a server running this extension has them.
+
 ## 1.1.4 -- 2026-10-08
 
 * **A baseline is re-planned against the tables its author meant.** Up to 1.1.3
